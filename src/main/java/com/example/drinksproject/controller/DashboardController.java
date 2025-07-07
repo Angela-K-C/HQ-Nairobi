@@ -3,10 +3,7 @@ package com.example.drinksproject.controller;
 import com.example.drinksproject.HelloApplication;
 import com.example.drinksproject.Session;
 import com.example.drinksproject.model.*;
-
-import com.example.drinksproject.rmi.shared.CustomerService;
-import com.example.drinksproject.rmi.shared.DrinkService;
-import com.example.drinksproject.rmi.shared.OrderService;
+import com.example.drinksproject.rmi.shared.*;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -72,10 +69,9 @@ public class DashboardController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         try {
-            // Connect to RMI services
-            orderService = (OrderService) Naming.lookup("rmi://localhost/OrderService");
-            customerService = (CustomerService) Naming.lookup("rmi://localhost/CustomerService");
-            drinkService = (DrinkService) Naming.lookup("rmi://localhost/DrinkService");
+            orderService = (OrderService) Naming.lookup(RMIConfig.getURL("OrderService"));
+            customerService = (CustomerService) Naming.lookup(RMIConfig.getURL("CustomerService"));
+            drinkService = (DrinkService) Naming.lookup(RMIConfig.getURL("DrinkService"));
         } catch (Exception e) {
             showAlert("❗ Could not connect to RMI services: " + e.getMessage());
             e.printStackTrace();
@@ -88,14 +84,11 @@ public class DashboardController implements Initializable {
         loadDrinksFromRMI();
         updateDashboardStats();
 
-        // Hide HQ-only UI for branches
         if (!isHeadquarters) {
             tabPane.getTabs().remove(viewReportsTab);
             quickActions.getChildren().remove(viewReportsLink);
         }
     }
-
-    // ========== Setup Methods ==========
 
     private void initializeTableColumns() {
         orderIdCol.setCellValueFactory(cell -> cell.getValue().orderIdProperty().asString());
@@ -116,8 +109,6 @@ public class DashboardController implements Initializable {
             }
         });
     }
-
-    // ========== RMI Data Loaders ==========
 
     private void loadOrders(String search) {
         try {

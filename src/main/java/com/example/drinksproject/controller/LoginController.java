@@ -4,6 +4,7 @@ import com.example.drinksproject.HelloApplication;
 import com.example.drinksproject.Session;
 import com.example.drinksproject.rmi.shared.LoginResponseDTO;
 import com.example.drinksproject.rmi.shared.LoginService;
+import com.example.drinksproject.rmi.shared.RMIConfig;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -44,7 +45,7 @@ public class LoginController implements Initializable {
         statusLabel.setVisible(false);
 
         try {
-            loginService = (LoginService) Naming.lookup("rmi://localhost/LoginService");
+            loginService = (LoginService) Naming.lookup(RMIConfig.getURL("LoginService"));
         } catch (Exception e) {
             statusLabel.setText("❗ Could not connect to login service.");
             e.printStackTrace();
