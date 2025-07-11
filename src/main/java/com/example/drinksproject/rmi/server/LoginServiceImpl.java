@@ -18,6 +18,30 @@ public class LoginServiceImpl extends UnicastRemoteObject implements LoginServic
     }
 
     @Override
+    public boolean registerUser(String username, String password, String branchName) throws RemoteException {
+        try (Connection connection = DBConnection.getConnection()){
+                String getBranchIdQuery = "SELECT branch_id FROM branch WHERE (branch_name) = ? ";
+                String checkUserExists = "SELECT * FROM admin WHERE username = ?";
+                String insertUserQuery = "INSERT INTO admin (username, password, branch_id) VALUES (?,?,?)";
+
+                int branchId = -1;
+
+                try (PreparedStatement statement = connection.prepareStatement(getBranchIdQuery)) {
+                    statement.setString(1, branchName);
+
+                    ResultSet resultSet = statement.executeQuery();
+                    if (rs.next()) {
+                        branchId = rs.getInt("branch_id");
+                    }
+                }
+        }
+
+                {
+
+        }
+    }
+
+    @Override
     public LoginResponseDTO login(String username, String password, String branchName) throws RemoteException {
         String query = """
             SELECT u.username, b.branch_id, b.branch_name
