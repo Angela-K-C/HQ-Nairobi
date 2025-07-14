@@ -239,14 +239,22 @@ public class DashboardController implements Initializable, CustomerService {
 
 
             for (Customer customer : customers) {
-                CustomerOrder order = new CustomerOrder(String.valueOf(customer.getId()),
-                        customer.getName(), customer.getPhone(), OrderDao.getAllOrders(
-                                "",
-                        customer.getName()
-                ).size());
+                try {
+                    int orderCount = orderService.getAllOrders("", customer.getName()).size();
 
-                customerorders.add(order);
+                    CustomerOrder order = new CustomerOrder(
+                            String.valueOf(customer.getId()),
+                            customer.getName(),
+                            customer.getPhone(),
+                            orderCount
+                    );
+
+                    customerorders.add(order);
+                } catch (RemoteException e) {
+                    showAlert("Failed to load orders for " + customer.getName() + ": " + e.getMessage());
+                }
             }
+
 
             customersTable.setItems(FXCollections.observableArrayList(customerorders));
 
@@ -275,16 +283,32 @@ public class DashboardController implements Initializable, CustomerService {
     }
 
     public List<Customer> getAllCustomers() {
-        return CustomerDao.getAllCustomers();
+        try {
+            return customerService.getAllCustomers(); // RMI call
+        } catch (RemoteException e) {
+            showAlert("Failed to retrieve customers: " + e.getMessage());
+            return new ArrayList<>(); // return empty list on failure
+        }
     }
 
     public boolean registerCustomer(String name, String phone) {
-        return CustomerDao.registerUser(name, phone);
+        try {
+            return customerService.registerCustomer(name, phone); // RMI call
+        } catch (RemoteException e) {
+            showAlert("Failed to register customer: " + e.getMessage());
+            return false;
+        }
     }
 
     public int getCustomerCount() {
-        return CustomerDao.getAllCustomers().toArray().length;
+        try {
+            return customerService.getAllCustomers().size(); // RMI call
+        } catch (RemoteException e) {
+            showAlert("Failed to get customer count: " + e.getMessage());
+            return 0;
+        }
     }
+
 
     // ========== UI Button Actions ==========
 
