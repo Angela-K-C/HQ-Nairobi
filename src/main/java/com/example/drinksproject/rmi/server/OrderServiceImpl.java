@@ -3,12 +3,16 @@ package com.example.drinksproject.rmi.server;
 import com.example.drinksproject.DBConnection;
 import com.example.drinksproject.rmi.shared.OrderService;
 
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.sql.*;
 import java.util.List;
 import java.util.ArrayList; // If you're creating new ArrayLists
 import com.example.drinksproject.model.OrderDTO;
+import com.example.drinksproject.rmi.shared.StockService;
 
 
 public class OrderServiceImpl extends UnicastRemoteObject implements OrderService {
@@ -37,21 +41,58 @@ public class OrderServiceImpl extends UnicastRemoteObject implements OrderServic
         return -1;
     }
 
+    private int getBranchIdByOrder(int orderId) {
+        String query = "SELECT branch_id FROM `order` WHERE order_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setInt(1, orderId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("branch_id");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+
     @Override
     public boolean addOrderItem(int orderId, int drinkId, int quantity, double totalPrice) throws RemoteException {
         String query = "INSERT INTO orderitem (order_id, drink_id, quantity, total_price) VALUES (?, ?, ?, ?)";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
+
             stmt.setInt(1, orderId);
             stmt.setInt(2, drinkId);
             stmt.setInt(3, quantity);
             stmt.setDouble(4, totalPrice);
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
+
+            boolean inserted = stmt.executeUpdate() > 0;
+
+            if (inserted) {
+                // ✅ Get branchId for the order
+                int branchId = getBranchIdByOrder(orderId);
+                if (branchId == -1) return false;
+
+                // ✅ Lookup StockService from RMI Registry
+                Registry registry = LocateRegistry.getRegistry("localhost", 1099); // Adjust host/port as needed
+                StockService stockService = (StockService) registry.lookup("StockService");
+
+                // ✅ Deduct stock using RMI
+                return stockService.deductStock(branchId, drinkId, quantity);
+            }
+
+        } catch (SQLException | NotBoundException | RemoteException e) {
             e.printStackTrace();
         }
+
         return false;
     }
+
 
     @Override
     public List<OrderDTO> getAllOrders(String searchString, String branchname) throws RemoteException {

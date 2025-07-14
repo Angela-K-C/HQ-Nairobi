@@ -143,6 +143,8 @@ public class DashboardController implements Initializable, CustomerService {
         updateDashboardStats();
         loadStocksFromRMI();
         loadBranchesToChoiceBox();
+        showLowStockWarnings();
+
 
 
         startAutoRefresh();
@@ -264,6 +266,7 @@ public class DashboardController implements Initializable, CustomerService {
                     loadCustomersFromRMI();
                     loadDrinksFromRMI();
                     updateDashboardStats();
+                    loadStocksFromRMI();
                 } catch (Exception e) {
                     System.err.println("Auto-refresh error: " + e.getMessage());
                 }
@@ -410,16 +413,21 @@ public class DashboardController implements Initializable, CustomerService {
             boolean allItemsInserted = true;
             for (OrderItem item : orderItems) {
                 boolean success = orderService.addOrderItem(orderId, item.getDrinkId(), item.getQuantity(), item.getTotalPrice());
+
                 if (!success) {
                     allItemsInserted = false;
                     break;
                 }
+
+                // Reduce stock for the branch
+                stockService.deductStock(item.getDrinkId(), branchId, item.getQuantity());
             }
 
             if (allItemsInserted) {
                 showAlert("✅ Order placed successfully!");
-                resetOrderForm();
+                resetOrderForm(); // this now preserves selected customer
                 loadOrders(searchField.getText().trim());
+                showLowStockWarnings();
             } else {
                 showAlert("⚠️ Order saved but failed to save one or more items.");
             }
@@ -430,15 +438,18 @@ public class DashboardController implements Initializable, CustomerService {
         }
     }
 
-//    load stocks from RMI
-    private void loadStocksFromRMI() {
-        try {
-            List<Stock> stockList = stockService.getAllStocks();
-            stocksTable.setItems(FXCollections.observableArrayList(stockList));
-        } catch (Exception e) {
-            showAlert("⚠️ Failed to load stock data: " + e.getMessage());
-        }
+
+    //    load stocks from RMI
+private void loadStocksFromRMI() {
+    try {
+        String currentBranch = Session.getBranchName(); // replace with your actual session class
+        List<Stock> stockList = stockService.getAllStocks(currentBranch);
+        stocksTable.setItems(FXCollections.observableArrayList(stockList));
+    } catch (Exception e) {
+        showAlert("⚠️ Failed to load stock data: " + e.getMessage());
     }
+}
+
 
     private void loadBranchesToChoiceBox() {
         try {
@@ -453,6 +464,14 @@ public class DashboardController implements Initializable, CustomerService {
 
     @FXML
     private void handleRestock(ActionEvent event) {
+        String currentBranch = Session.getBranchName(); // Replace with your actual session class/method
+
+        // ✅ Block non-Nairobi branches
+        if (!"Nairobi".equalsIgnoreCase(currentBranch)) {
+            showAlert("⛔ Only Nairobi branch is allowed to restock items.");
+            return;
+        }
+
         Branch selectedBranch = stockBranchChoiceBox.getValue();
         Drink selectedDrink = stockDrinkChoiceBox.getValue();
         String qtyText = stockAddQuantityField.getText().trim();
@@ -472,7 +491,11 @@ public class DashboardController implements Initializable, CustomerService {
         }
 
         try {
-            boolean success = stockService.addStock(selectedBranch.getBranchId(), selectedDrink.getId(), quantity);
+            boolean success = stockService.addStock(
+                    selectedBranch.getBranchId(),
+                    selectedDrink.getId(),
+                    quantity
+            );
             if (success) {
                 showAlert("✅ Restocked successfully.");
                 stockAddQuantityField.clear();
@@ -488,10 +511,13 @@ public class DashboardController implements Initializable, CustomerService {
     }
 
 
-//    show low stock warning
+
+    //    show low stock warning
 private void showLowStockWarnings() {
     try {
-        List<Stock> lowStocks = stockService.getLowStockItems(10); // threshold = 10
+        String currentBranch = Session.getBranchName(); // Example
+        List<Stock> lowStocks = stockService.getLowStockItems(10, currentBranch);
+
         if (!lowStocks.isEmpty()) {
             StringBuilder message = new StringBuilder("Low stock alerts:\n\n");
             for (Stock s : lowStocks) {
@@ -511,7 +537,6 @@ private void showLowStockWarnings() {
 
 
 
-
     // ========== Utility Methods ==========
 
     private void resetOrderForm() {
@@ -519,7 +544,6 @@ private void showLowStockWarnings() {
         orderItemsList.getChildren().clear();
         orderTotalLabel.setText("Ksh 0");
         totalOrderCost = 0.0;
-        customerChoiceBox.setValue(null);
     }
 
     private void showAlert(String message) {

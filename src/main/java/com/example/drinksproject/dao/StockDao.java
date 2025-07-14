@@ -9,17 +9,33 @@ import java.util.List;
 
 public class StockDao {
 
-    public static List<Stock> getAllStocks() {
+    public static List<Stock> getAllStocks(String currentBranch) {
         List<Stock> stocks = new ArrayList<>();
-        String sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
-                "FROM stock s " +
-                "JOIN drink d ON s.drink_id = d.drink_id " +
-                "JOIN branch b ON s.branch_id = b.branch_id " +
-                "ORDER BY b.branch_name, d.drink_name";
+        String sql;
+
+        if ("Nairobi".equalsIgnoreCase(currentBranch)) {
+            // Nairobi sees everything
+            sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
+                    "FROM stock s " +
+                    "JOIN drink d ON s.drink_id = d.drink_id " +
+                    "JOIN branch b ON s.branch_id = b.branch_id";
+        } else {
+            // Others only see their own branch's data
+            sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
+                    "FROM stock s " +
+                    "JOIN drink d ON s.drink_id = d.drink_id " +
+                    "JOIN branch b ON s.branch_id = b.branch_id " +
+                    "WHERE b.branch_name = ?";
+        }
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            if (!"Nairobi".equalsIgnoreCase(currentBranch)) {
+                stmt.setString(1, currentBranch);
+            }
+
+            ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
                 stocks.add(new Stock(
@@ -36,18 +52,35 @@ public class StockDao {
         return stocks;
     }
 
-    public static List<Stock> getLowStockItems(int threshold) {
+
+    public static List<Stock> getLowStockItems(int threshold, String currentBranch) {
         List<Stock> lowStocks = new ArrayList<>();
-        String sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
-                "FROM stock s " +
-                "JOIN drink d ON s.drink_id = d.drink_id " +
-                "JOIN branch b ON s.branch_id = b.branch_id " +
-                "WHERE s.quantity < ?";
+        String sql;
+
+        if ("Nairobi".equalsIgnoreCase(currentBranch)) {
+            // Nairobi sees all low stock items across all branches
+            sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
+                    "FROM stock s " +
+                    "JOIN drink d ON s.drink_id = d.drink_id " +
+                    "JOIN branch b ON s.branch_id = b.branch_id " +
+                    "WHERE s.quantity < ?";
+        } else {
+            // Other branches see only their own low stock items
+            sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
+                    "FROM stock s " +
+                    "JOIN drink d ON s.drink_id = d.drink_id " +
+                    "JOIN branch b ON s.branch_id = b.branch_id " +
+                    "WHERE s.quantity < ? AND b.branch_name = ?";
+        }
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, threshold);
+            if (!"Nairobi".equalsIgnoreCase(currentBranch)) {
+                stmt.setString(2, currentBranch);
+            }
+
             ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
@@ -64,6 +97,8 @@ public class StockDao {
 
         return lowStocks;
     }
+
+
 
     public static boolean addStock(int branchId, int drinkId, int quantityToAdd) {
         String sql = "UPDATE stock SET quantity = quantity + ? WHERE branch_id = ? AND drink_id = ?";
@@ -207,5 +242,37 @@ public class StockDao {
             e.printStackTrace();
         }
     }
+
+    public static List<Stock> getLowStockForBranch(int branchId, int threshold) {
+        List<Stock> lowStocks = new ArrayList<>();
+        String sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
+                "FROM stock s " +
+                "JOIN drink d ON s.drink_id = d.drink_id " +
+                "JOIN branch b ON s.branch_id = b.branch_id " +
+                "WHERE s.branch_id = ? AND s.quantity < ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, branchId);
+            stmt.setInt(2, threshold);
+
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                lowStocks.add(new Stock(
+                        rs.getString("branch_name"),
+                        rs.getString("drink_name"),
+                        rs.getInt("quantity")
+                ));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return lowStocks;
+    }
+
 
 }

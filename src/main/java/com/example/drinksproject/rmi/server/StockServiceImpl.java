@@ -17,13 +17,13 @@ public class StockServiceImpl extends UnicastRemoteObject implements StockServic
     }
 
     @Override
-    public List<Stock> getAllStocks() throws RemoteException {
-        return StockDao.getAllStocks();
+    public List<Stock> getAllStocks(String currentBranch) throws RemoteException {
+        return StockDao.getAllStocks(currentBranch);
     }
 
     @Override
-    public List<Stock> getLowStockItems(int threshold) throws RemoteException {
-        return StockDao.getLowStockItems(threshold);
+    public List<Stock> getLowStockItems(int threshold, String branchName) throws RemoteException {
+        return StockDao.getLowStockItems(threshold, branchName);
     }
 
     @Override
@@ -45,4 +45,6 @@ public class StockServiceImpl extends UnicastRemoteObject implements StockServic
     public List<Branch> getAllBranches() throws RemoteException {
         return BranchDao.getAllBranches();
     }
+
+
 }

@@ -9,9 +9,9 @@ import java.util.List;
 
 public interface StockService extends Remote {
 
-    List<Stock> getAllStocks() throws RemoteException;
+    List<Stock> getAllStocks(String currentBranch) throws RemoteException;
 
-    List<Stock> getLowStockItems(int threshold) throws RemoteException;
+    List<Stock> getLowStockItems(int threshold, String branchName) throws RemoteException;
 
     boolean addStock(int branchId, int drinkId, int quantityToAdd) throws RemoteException;
 
