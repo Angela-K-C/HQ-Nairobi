@@ -20,4 +20,7 @@ public interface StockService extends Remote {
     boolean isOutOfStock(int branchId, int drinkId) throws RemoteException;
 
     List<Branch> getAllBranches() throws RemoteException;
+
+    void registerAlertListener(StockAlertListener listener) throws RemoteException;
+    void unregisterAlertListener(StockAlertListener listener) throws RemoteException;
 }

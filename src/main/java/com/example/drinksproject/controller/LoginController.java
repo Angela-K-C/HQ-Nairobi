@@ -6,6 +6,7 @@ import com.example.drinksproject.rmi.shared.LoginResponseDTO;
 import com.example.drinksproject.rmi.shared.LoginService;
 import com.example.drinksproject.rmi.shared.RMIConfig;
 
+import com.example.drinksproject.rmi.shared.StockService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -75,12 +76,30 @@ public class LoginController implements Initializable {
                         Thread.sleep(1000);
                         Platform.runLater(() -> {
                             try {
-                                Parent root = FXMLLoader.load(HelloApplication.class.getResource("dashboard.fxml"));
+                                FXMLLoader loader = new FXMLLoader(HelloApplication.class.getResource("dashboard.fxml"));
+                                Parent root = loader.load();
+
+// Get the DashboardController instance
+                                DashboardController dashboardController = loader.getController();
+
+                                try {
+                                    // Manually inject the stockService here
+                                    StockService stockService = (StockService) Naming.lookup(RMIConfig.getURL("StockService"));
+                                    dashboardController.setStockService(stockService);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    statusLabel.setText("❗ Could not load StockService.");
+                                    statusLabel.setVisible(true);
+                                    return; // Stop if the StockService setup fails
+                                }
+
+// Continue to load the dashboard scene
                                 stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
                                 scene = new Scene(root);
                                 stage.setScene(scene);
                                 stage.setMaximized(true);
                                 stage.show();
+
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }

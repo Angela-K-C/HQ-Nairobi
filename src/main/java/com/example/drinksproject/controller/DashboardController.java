@@ -4,8 +4,12 @@ import com.example.drinksproject.HelloApplication;
 import com.example.drinksproject.Session;
 import com.example.drinksproject.dao.CustomerDao;
 import com.example.drinksproject.dao.OrderDao;
+import com.example.drinksproject.listener.StockAlertListenerImpl;
 import com.example.drinksproject.model.*;
 import com.example.drinksproject.rmi.shared.*;
+import com.example.drinksproject.rmi.shared.StockAlertListener;
+import com.example.drinksproject.model.Stock;
+
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -116,6 +120,8 @@ public class DashboardController implements Initializable, CustomerService {
     private DrinkService drinkService;
     private CustomerService customerService;
     private StockService stockService;
+    private StockAlertListener alertListener;
+
 
 
     // Auto-refresh task
@@ -124,6 +130,10 @@ public class DashboardController implements Initializable, CustomerService {
     // ========== Initialization ==========
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+
+
+
+
         try {
             orderService = (OrderService) Naming.lookup(RMIConfig.getURL("OrderService"));
             customerService = (CustomerService) Naming.lookup(RMIConfig.getURL("CustomerService"));
@@ -513,27 +523,45 @@ private void loadStocksFromRMI() {
 
 
     //    show low stock warning
-private void showLowStockWarnings() {
-    try {
-        String currentBranch = Session.getBranchName(); // Example
-        List<Stock> lowStocks = stockService.getLowStockItems(10, currentBranch);
+    private void showLowStockWarnings() {
+        try {
+            String currentBranch = Session.getBranchName();
+            List<Stock> lowStocks = new ArrayList<>();
 
-        if (!lowStocks.isEmpty()) {
-            StringBuilder message = new StringBuilder("Low stock alerts:\n\n");
-            for (Stock s : lowStocks) {
-                message.append(String.format("- %s at %s: %d left\n", s.getDrinkName(), s.getBranchName(), s.getCurrentStock()));
+            if ("Nairobi".equalsIgnoreCase(currentBranch)) {
+                // Nairobi sees low stock for all branches
+                List<String> branches = List.of("Nairobi", "Mombasa", "Kisumu");
+                for (String branch : branches) {
+                    lowStocks.addAll(stockService.getLowStockItems(10, branch));
+                    System.out.println("Current branch: " + currentBranch);
+
+                }
+            } else {
+                // Other branches see only their own
+                lowStocks.addAll(stockService.getLowStockItems(10, currentBranch));
             }
 
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Low Stock Warning");
-            alert.setHeaderText("Some items are running low!");
-            alert.setContentText(message.toString());
-            alert.showAndWait();
+            if (!lowStocks.isEmpty()) {
+                StringBuilder message = new StringBuilder("Low stock alerts:\n\n");
+                for (Stock s : lowStocks) {
+                    message.append(String.format("- %s at %s: %d left\n",
+                            s.getDrinkName(), s.getBranchName(), s.getCurrentStock()));
+                }
+
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Low Stock Warning");
+                alert.setHeaderText("Some items are running low!");
+                alert.setContentText(message.toString());
+                alert.showAndWait();
+            }
+        } catch (RemoteException e) {
+            showAlert("⚠️ Could not check low stock: " + e.getMessage());
         }
-    } catch (RemoteException e) {
-        showAlert("⚠️ Could not check low stock: " + e.getMessage());
     }
-}
+
+
+
+
 
 
 
@@ -552,6 +580,24 @@ private void showLowStockWarnings() {
         alert.setContentText(message);
         alert.showAndWait();
     }
+
+
+
+
+
+    public void setStockService(StockService stockService) throws RemoteException {
+        this.stockService = stockService;
+
+        if (Session.getBranchName().equalsIgnoreCase("Nairobi")) {
+            try {
+                StockAlertListener listener = new StockAlertListenerImpl();
+                stockService.registerAlertListener(listener);
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
 }
 
 

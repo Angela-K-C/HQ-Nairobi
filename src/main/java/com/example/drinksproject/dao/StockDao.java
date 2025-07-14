@@ -274,5 +274,31 @@ public class StockDao {
         return lowStocks;
     }
 
+    // inside StockDao (package dao)
+    public static List<Stock> getGlobalLowStockItems(int threshold) {
+        List<Stock> lowStocks = new ArrayList<>();
+        String sql = "SELECT d.drink_name, b.branch_name, s.quantity " +
+                "FROM stock s JOIN drink d ON s.drink_id=d.drink_id " +
+                "JOIN branch b ON s.branch_id=b.branch_id " +
+                "WHERE s.quantity < ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement st = conn.prepareStatement(sql)) {
+            st.setInt(1, threshold);
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) {
+                    lowStocks.add(new Stock(
+                            rs.getString("branch_name"),
+                            rs.getString("drink_name"),
+                            rs.getInt("quantity")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lowStocks;
+    }
+
+
 
 }
