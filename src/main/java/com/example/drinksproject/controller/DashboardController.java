@@ -94,6 +94,18 @@ public class DashboardController implements Initializable, CustomerService {
     @FXML
     private Label branchNameLabel;
 
+
+    @FXML private TableView<Stock> stocksTable;
+    @FXML private TableColumn<Stock, String> stockBranchNameCol;
+    @FXML private TableColumn<Stock, String> stockDrinkNameCol;
+    @FXML private TableColumn<Stock, String> currentStockCol;
+
+    @FXML private ChoiceBox<Drink> stockDrinkChoiceBox;
+    @FXML private ChoiceBox<Branch> stockBranchChoiceBox;
+    @FXML private TextField stockAddQuantityField;
+    @FXML private Button restockButton;
+
+
     // ========== Internal Variables ==========
     private final List<OrderItem> orderItems = new ArrayList<>();
     private double totalOrderCost = 0.0;
@@ -103,6 +115,8 @@ public class DashboardController implements Initializable, CustomerService {
     private OrderService orderService;
     private DrinkService drinkService;
     private CustomerService customerService;
+    private StockService stockService;
+
 
     // Auto-refresh task
     private ScheduledExecutorService scheduler;
@@ -114,6 +128,8 @@ public class DashboardController implements Initializable, CustomerService {
             orderService = (OrderService) Naming.lookup(RMIConfig.getURL("OrderService"));
             customerService = (CustomerService) Naming.lookup(RMIConfig.getURL("CustomerService"));
             drinkService = (DrinkService) Naming.lookup(RMIConfig.getURL("DrinkService"));
+            stockService = (StockService) Naming.lookup(RMIConfig.getURL("StockService"));
+
         } catch (Exception e) {
             showAlert("❗ Could not connect to RMI services: " + e.getMessage());
             e.printStackTrace();
@@ -125,6 +141,9 @@ public class DashboardController implements Initializable, CustomerService {
         loadCustomersFromRMI();
         loadDrinksFromRMI();
         updateDashboardStats();
+        loadStocksFromRMI();
+        loadBranchesToChoiceBox();
+
 
         startAutoRefresh();
 
@@ -141,6 +160,12 @@ public class DashboardController implements Initializable, CustomerService {
         itemsCol.setCellValueFactory(cell -> cell.getValue().itemsProperty());
         amountCol.setCellValueFactory(cell -> cell.getValue().amountProperty().asObject());
         dateCol.setCellValueFactory(cell -> cell.getValue().dateProperty());
+
+//        table initialization for stocks
+        stockBranchNameCol.setCellValueFactory(cell -> cell.getValue().branchNameProperty());
+        stockDrinkNameCol.setCellValueFactory(cell -> cell.getValue().drinkNameProperty());
+        currentStockCol.setCellValueFactory(cell -> cell.getValue().currentStockProperty().asString());
+
     }
 
     private void setupUIBindings() {
@@ -179,6 +204,8 @@ public class DashboardController implements Initializable, CustomerService {
         try {
             List<Drink> drinks = drinkService.getAllDrinks();
             drinkChoiceBox.setItems(FXCollections.observableArrayList(drinks));
+            stockDrinkChoiceBox.setItems(FXCollections.observableArrayList(drinks));
+
         } catch (Exception e) {
             showAlert("⚠️ Could not load drinks: " + e.getMessage());
             e.printStackTrace();
@@ -402,6 +429,88 @@ public class DashboardController implements Initializable, CustomerService {
             e.printStackTrace();
         }
     }
+
+//    load stocks from RMI
+    private void loadStocksFromRMI() {
+        try {
+            List<Stock> stockList = stockService.getAllStocks();
+            stocksTable.setItems(FXCollections.observableArrayList(stockList));
+        } catch (Exception e) {
+            showAlert("⚠️ Failed to load stock data: " + e.getMessage());
+        }
+    }
+
+    private void loadBranchesToChoiceBox() {
+        try {
+            List<Branch> branches = stockService.getAllBranches();
+            stockBranchChoiceBox.setItems(FXCollections.observableArrayList(branches));
+        } catch (Exception e) {
+            showAlert("⚠️ Could not load branches: " + e.getMessage());
+        }
+    }
+
+//    Add restock Handler via RMI
+
+    @FXML
+    private void handleRestock(ActionEvent event) {
+        Branch selectedBranch = stockBranchChoiceBox.getValue();
+        Drink selectedDrink = stockDrinkChoiceBox.getValue();
+        String qtyText = stockAddQuantityField.getText().trim();
+
+        if (selectedBranch == null || selectedDrink == null || qtyText.isEmpty()) {
+            showAlert("❗ Please select a branch, a drink, and enter quantity.");
+            return;
+        }
+
+        int quantity;
+        try {
+            quantity = Integer.parseInt(qtyText);
+            if (quantity <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            showAlert("❗ Quantity must be a positive number.");
+            return;
+        }
+
+        try {
+            boolean success = stockService.addStock(selectedBranch.getBranchId(), selectedDrink.getId(), quantity);
+            if (success) {
+                showAlert("✅ Restocked successfully.");
+                stockAddQuantityField.clear();
+                stockBranchChoiceBox.setValue(null);
+                stockDrinkChoiceBox.setValue(null);
+                loadStocksFromRMI();
+            } else {
+                showAlert("❌ Failed to restock.");
+            }
+        } catch (RemoteException e) {
+            showAlert("⚠️ RMI Error during restock: " + e.getMessage());
+        }
+    }
+
+
+//    show low stock warning
+private void showLowStockWarnings() {
+    try {
+        List<Stock> lowStocks = stockService.getLowStockItems(10); // threshold = 10
+        if (!lowStocks.isEmpty()) {
+            StringBuilder message = new StringBuilder("Low stock alerts:\n\n");
+            for (Stock s : lowStocks) {
+                message.append(String.format("- %s at %s: %d left\n", s.getDrinkName(), s.getBranchName(), s.getCurrentStock()));
+            }
+
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Low Stock Warning");
+            alert.setHeaderText("Some items are running low!");
+            alert.setContentText(message.toString());
+            alert.showAndWait();
+        }
+    } catch (RemoteException e) {
+        showAlert("⚠️ Could not check low stock: " + e.getMessage());
+    }
+}
+
+
+
 
     // ========== Utility Methods ==========
 
