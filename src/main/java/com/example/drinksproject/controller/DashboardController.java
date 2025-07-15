@@ -522,6 +522,11 @@ public class DashboardController implements Initializable, CustomerService {
     }
 
 
+    @FXML
+    public void cancel(ActionEvent event) {
+        resetOrderForm();
+    }
+
 
     //    load stocks from RMI
 private void loadStocksFromRMI() {
