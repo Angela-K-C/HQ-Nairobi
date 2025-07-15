@@ -22,8 +22,8 @@ public class HelloApplication extends Application {
 
     public static void main(String[] args) {
         // Initialize stock for all branches
-        int defaultQuantity = 20;
-        StockDao.initializeStockForAllBranches(defaultQuantity);
+//        int defaultQuantity = 20;
+//        StockDao.initializeStockForAllBranches(defaultQuantity);
 
         launch(args);
     }

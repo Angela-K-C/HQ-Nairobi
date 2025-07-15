@@ -300,5 +300,25 @@ public class StockDao {
     }
 
 
+    public static boolean isOutOfStock(int branchId, int drinkId, int qtyToRemove) {
+        String sql = "SELECT quantity FROM stock WHERE branch_id =? AND drink_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);){
+
+            statement.setInt(1, branchId);
+            statement.setInt(2, drinkId);
+
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                return (resultSet.getInt("quantity") - qtyToRemove) < 0;
+            }
+        }catch (Exception e){
+            System.out.println("Stock check Error" +e);
+        }
+        return false;
+    }
+
+
 
 }

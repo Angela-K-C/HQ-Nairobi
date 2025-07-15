@@ -108,6 +108,7 @@ public class DashboardController implements Initializable, CustomerService {
     @FXML private ChoiceBox<Branch> stockBranchChoiceBox;
     @FXML private TextField stockAddQuantityField;
     @FXML private Button restockButton;
+    private Map<Integer, Integer> drinkStockMap = new HashMap<>();
 
 
     // ========== Internal Variables ==========
@@ -143,6 +144,30 @@ public class DashboardController implements Initializable, CustomerService {
         } catch (Exception e) {
             showAlert("❗ Could not connect to RMI services: " + e.getMessage());
             e.printStackTrace();
+        }
+
+//        preventing negative numbers
+
+        try {
+            List<Drink> allDrinks = drinkService.getAllDrinks(); // fetch all drinks from RMI
+            List<Stock> branchStocks = stockService.getAllStocks(Session.getBranchName()); // e.g. "Nairobi"
+
+            // Fill choice box
+            drinkChoiceBox.setItems(FXCollections.observableArrayList(allDrinks));
+
+            // Map for stock
+            for (Drink drink : allDrinks) {
+                for (Stock stock : branchStocks) {
+                    if (stock.getDrinkName().equalsIgnoreCase(drink.getName())) {
+                        drinkStockMap.put(drink.getId(), stock.getCurrentStock());
+                        break;
+                    }
+                }
+            }
+
+        } catch (RemoteException e) {
+            e.printStackTrace();
+            showAlert("❌ Failed to load drinks or stocks.");
         }
 
         initializeTableColumns();
@@ -402,6 +427,16 @@ public class DashboardController implements Initializable, CustomerService {
             return;
         }
 
+//        Available stocks
+
+        Integer availableStock = drinkStockMap.get(selectedDrink.getId());
+
+        if (availableStock == null) {
+            showAlert("❗ Could not find stock information for selected drink.");
+            return;
+        }
+
+
         double price = selectedDrink.getPrice();
         double itemTotal = price * quantity;
 
@@ -437,6 +472,18 @@ public class DashboardController implements Initializable, CustomerService {
 
         try {
             int branchId = Session.getBranchId();
+
+            // ✅ STEP 1: Check stock availability for each item
+            for (OrderItem item : orderItems) {
+                boolean hasStock = !stockService.isOutOfStock(branchId, item.getDrinkId(), item.getQuantity());
+
+                if (!hasStock) {
+                    showAlert("❌ Cannot place order. Insufficient stock for: " + item.getDrinkName());
+                    return; // Stop placing order
+                }
+            }
+
+            // ✅ STEP 2: Place order
             int orderId = orderService.placeOrder(selectedCustomer.getId(), branchId);
 
             if (orderId == -1) {
@@ -445,6 +492,8 @@ public class DashboardController implements Initializable, CustomerService {
             }
 
             boolean allItemsInserted = true;
+
+            // ✅ STEP 3: Insert order items and deduct stock
             for (OrderItem item : orderItems) {
                 boolean success = orderService.addOrderItem(orderId, item.getDrinkId(), item.getQuantity(), item.getTotalPrice());
 
@@ -453,13 +502,13 @@ public class DashboardController implements Initializable, CustomerService {
                     break;
                 }
 
-                // Reduce stock for the branch
+                // Deduct stock
                 stockService.deductStock(item.getDrinkId(), branchId, item.getQuantity());
             }
 
             if (allItemsInserted) {
                 showAlert("✅ Order placed successfully!");
-                resetOrderForm(); // this now preserves selected customer
+                resetOrderForm(); // keeps selected customer
                 loadOrders(searchField.getText().trim());
                 showLowStockWarnings();
             } else {
@@ -471,6 +520,7 @@ public class DashboardController implements Initializable, CustomerService {
             e.printStackTrace();
         }
     }
+
 
 
     //    load stocks from RMI

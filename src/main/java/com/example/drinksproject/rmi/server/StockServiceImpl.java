@@ -71,6 +71,10 @@ public class StockServiceImpl extends UnicastRemoteObject implements StockServic
         return BranchDao.getAllBranches();
     }
 
+    public boolean isOutOfStock(int branchId, int drinkId, int qtyToRemove) throws RemoteException {
+        return StockDao.isOutOfStock(branchId, drinkId, qtyToRemove);
+    }
+
 
 
 
